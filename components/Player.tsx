@@ -12,6 +12,7 @@ interface PlayerProps {
   benchPositions?: { pos: [number, number, number], rot: [number, number, number] }[];
   visible?: boolean;
   isOnTrampoline?: boolean;
+  activeAccessory?: string | null;
 }
 
 const OBSTACLES = [
@@ -23,13 +24,58 @@ const OBSTACLES = [
   { x: -25, z: 45, w: 9, d: 6 },
   { x: 25, z: 45, w: 9, d: 6 },
   { x: 0, z: 95, w: 20, d: 5 },
-  { x: 0, z: 20, radius: 11 },
 ];
+
+const Accessory: React.FC<{ type: string | null }> = ({ type }) => {
+  if (!type) return null;
+  
+  if (type === 'red_hat' || type === 'blue_hat') {
+    return (
+      <group position={[0, 1.2, 0.1]}>
+        <mesh castShadow>
+          <boxGeometry args={[1.6, 0.4, 1.6]} />
+          <meshStandardMaterial color={type.includes('red') ? '#ef4444' : '#3b82f6'} />
+        </mesh>
+        <mesh position={[0, -0.1, 0.8]} castShadow>
+          <boxGeometry args={[1.4, 0.1, 0.8]} />
+          <meshStandardMaterial color={type.includes('red') ? '#ef4444' : '#3b82f6'} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (type === 'gold_crown') {
+    return (
+      <group position={[0, 1.3, 0]}>
+        <mesh castShadow>
+          <torusGeometry args={[0.8, 0.15, 8, 24]} rotation={[Math.PI / 2, 0, 0]} />
+          <meshStandardMaterial color="#facc15" metalness={1} roughness={0} />
+        </mesh>
+        {[0, 1, 2, 3].map(i => (
+          <mesh key={i} rotation={[0, (i / 4) * Math.PI * 2, 0]} position={[0, 0.3, 0.7]} castShadow>
+            <coneGeometry args={[0.2, 0.6, 4]} />
+            <meshStandardMaterial color="#facc15" metalness={1} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  if (type.includes('cape')) {
+    return (
+      <mesh position={[0, -0.5, -0.6]} rotation={[0.1, 0, 0]} castShadow>
+        <boxGeometry args={[1.8, 3.5, 0.1]} />
+        <meshStandardMaterial color={type.includes('dark') ? '#1e293b' : '#ef4444'} />
+      </mesh>
+    );
+  }
+
+  return null;
+};
 
 const PlayerFace: React.FC = () => {
   return (
-    <group position={[0, -0.05, 0.605]}>
-      {/* Sobrancelhas */}
+    <group position={[0, 0.6, 0.605]}>
       <mesh position={[-0.28, 0.42, 0.01]} rotation={[0, 0, 0.1]}>
         <boxGeometry args={[0.25, 0.05, 0.02]} />
         <meshBasicMaterial color="#312e81" />
@@ -38,34 +84,14 @@ const PlayerFace: React.FC = () => {
         <boxGeometry args={[0.25, 0.05, 0.02]} />
         <meshBasicMaterial color="#312e81" />
       </mesh>
-
-      {/* Olhos Detalhados */}
       {[-0.28, 0.28].map((x, i) => (
         <group key={i} position={[x, 0.15, 0]}>
-          {/* Fundo Branco */}
-          <mesh>
-            <planeGeometry args={[0.25, 0.35]} />
-            <meshBasicMaterial color="#ffffff" />
-          </mesh>
-          {/* Íris Azul */}
-          <mesh position={[0, -0.02, 0.01]}>
-            <planeGeometry args={[0.18, 0.2]} />
-            <meshBasicMaterial color="#3b82f6" />
-          </mesh>
-          {/* Pupila */}
-          <mesh position={[0, -0.02, 0.02]}>
-            <planeGeometry args={[0.08, 0.1]} />
-            <meshBasicMaterial color="#000000" />
-          </mesh>
-          {/* Brilho do Olhar */}
-          <mesh position={[0.05, 0.08, 0.03]}>
-            <planeGeometry args={[0.05, 0.05]} />
-            <meshBasicMaterial color="#ffffff" />
-          </mesh>
+          <mesh><planeGeometry args={[0.25, 0.35]} /><meshBasicMaterial color="#ffffff" /></mesh>
+          <mesh position={[0, -0.02, 0.01]}><planeGeometry args={[0.18, 0.2]} /><meshBasicMaterial color="#3b82f6" /></mesh>
+          <mesh position={[0, -0.02, 0.02]}><planeGeometry args={[0.08, 0.1]} /><meshBasicMaterial color="#000000" /></mesh>
+          <mesh position={[0.05, 0.08, 0.03]}><planeGeometry args={[0.05, 0.05]} /><meshBasicMaterial color="#ffffff" /></mesh>
         </group>
       ))}
-
-      {/* Boca com Volume 3D (Lábios) */}
       <group position={[0, -0.25, 0.02]} rotation={[Math.PI / 2, 0, 0]}>
         <mesh>
           <torusGeometry args={[0.18, 0.04, 12, 24, Math.PI]} />
@@ -77,31 +103,23 @@ const PlayerFace: React.FC = () => {
 };
 
 const Player: React.FC<PlayerProps> = ({ 
-  onMove, 
-  joystickVector, 
-  jumpPressed, 
-  isSitting = false, 
-  setIsSitting,
-  benchPositions = [],
-  visible = true,
-  isOnTrampoline = false
+  onMove, joystickVector, jumpPressed, isSitting = false, 
+  setIsSitting, benchPositions = [], visible = true, 
+  isOnTrampoline = false, activeAccessory = null 
 }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const leftLegRef = useRef<THREE.Mesh>(null);
-  const rightLegRef = useRef<THREE.Mesh>(null);
-  const leftArmRef = useRef<THREE.Mesh>(null);
-  const rightArmRef = useRef<THREE.Mesh>(null);
+  const bodyRef = useRef<THREE.Group>(null);
+  const leftLegRef = useRef<THREE.Group>(null);
+  const rightLegRef = useRef<THREE.Group>(null);
+  const leftArmRef = useRef<THREE.Group>(null);
+  const rightArmRef = useRef<THREE.Group>(null);
 
   const { camera } = useThree();
   const [keys, setKeys] = useState<Record<string, boolean>>({});
-  
   const velocityV = useRef(0);
   const isGrounded = useRef(true);
-  const gravity = -35;
-  const jumpStrength = 15;
-  const trampolineBoost = 28;
-
-  const sitData = useRef<{ pos: THREE.Vector3, rot: number } | null>(null);
+  const targetSitPos = useRef<THREE.Vector3 | null>(null);
+  const targetSitRot = useRef<number>(0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => setKeys(s => ({ ...s, [e.code]: true }));
@@ -116,76 +134,39 @@ const Player: React.FC<PlayerProps> = ({
 
   useEffect(() => {
     if (isSitting && groupRef.current) {
-      let closestBench = null;
+      let closest = null;
       let minDist = Infinity;
-      const pPos = groupRef.current.position;
-      for (const b of benchPositions) {
-        const bVec = new THREE.Vector3(...b.pos);
-        const d = pPos.distanceTo(bVec);
-        if (d < minDist) { minDist = d; closestBench = b; }
+      benchPositions.forEach(b => {
+        const d = groupRef.current!.position.distanceTo(new THREE.Vector3(...b.pos));
+        if (d < minDist) { minDist = d; closest = b; }
+      });
+      if (closest) {
+        targetSitPos.current = new THREE.Vector3(closest.pos[0], 1.5, closest.pos[2]);
+        targetSitRot.current = closest.rot[1];
+        velocityV.current = 0;
+        isGrounded.current = true;
       }
-      if (closestBench) {
-        const targetPos = new THREE.Vector3(...closestBench.pos);
-        targetPos.y = 0.5; 
-        groupRef.current.position.copy(targetPos);
-        groupRef.current.rotation.y = closestBench.rot[1];
-        sitData.current = { pos: targetPos.clone(), rot: closestBench.rot[1] };
-      }
-    } else { sitData.current = null; }
-  }, [isSitting, benchPositions]);
-
-  const checkCollision = (newX: number, newZ: number): boolean => {
-    const mapLimit = 145;
-    if (Math.abs(newX) > mapLimit || Math.abs(newZ) > mapLimit) return true;
-    const playerRadius = 1.5;
-    for (const obs of OBSTACLES) {
-      if ('radius' in obs) {
-        const dx = newX - obs.x;
-        const dz = newZ - obs.z;
-        if (Math.sqrt(dx * dx + dz * dz) < (obs.radius + playerRadius)) return true;
-      } else {
-        const halfW = (obs.w || 0) / 2 + playerRadius;
-        const halfD = (obs.d || 0) / 2 + playerRadius;
-        if (newX > obs.x - halfW && newX < obs.x + halfW && newZ > obs.z - halfD && newZ < obs.z + halfD) return true;
-      }
+    } else if (!isSitting && groupRef.current && targetSitPos.current) {
+      const angle = groupRef.current.rotation.y;
+      groupRef.current.position.x += Math.sin(angle) * 2.5;
+      groupRef.current.position.z += Math.cos(angle) * 2.5;
+      groupRef.current.position.y = 0;
+      targetSitPos.current = null;
     }
-    return false;
-  };
+  }, [isSitting, benchPositions]);
 
   useFrame((state, delta) => {
     if (!groupRef.current || !visible) return;
+    const lerpSpeed = 10 * delta;
 
-    if (isSitting && sitData.current) {
-      groupRef.current.position.copy(sitData.current.pos);
-      groupRef.current.rotation.y = sitData.current.rot;
-      if (leftLegRef.current) { leftLegRef.current.rotation.x = -Math.PI / 2; leftLegRef.current.position.z = 0.5; }
-      if (rightLegRef.current) { rightLegRef.current.rotation.x = -Math.PI / 2; rightLegRef.current.position.z = 0.5; }
-      if (leftArmRef.current) leftArmRef.current.rotation.x = 0.2;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = 0.2;
+    if (isSitting && targetSitPos.current) {
+      groupRef.current.position.lerp(targetSitPos.current, 12 * delta);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetSitRot.current, 12 * delta);
+      if (leftLegRef.current) leftLegRef.current.rotation.x = -Math.PI / 2.2;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = -Math.PI / 2.2;
+      if (bodyRef.current) bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, 1.25, lerpSpeed);
       onMove?.(groupRef.current.position);
       return;
-    }
-
-    if (isOnTrampoline && isGrounded.current) {
-      velocityV.current = trampolineBoost;
-      isGrounded.current = false;
-    }
-
-    if ((keys['Space'] || jumpPressed) && isGrounded.current) {
-      velocityV.current = jumpStrength;
-      isGrounded.current = false;
-    }
-
-    if (!isGrounded.current) {
-      velocityV.current += gravity * delta;
-      groupRef.current.position.y += velocityV.current * delta;
-      
-      const groundY = isOnTrampoline ? 1.2 : 0;
-      if (groupRef.current.position.y <= groundY) {
-        groupRef.current.position.y = groundY;
-        velocityV.current = isOnTrampoline ? trampolineBoost : 0;
-        isGrounded.current = isOnTrampoline ? false : true;
-      }
     }
 
     const moveSpeed = 16;
@@ -205,73 +186,97 @@ const Player: React.FC<PlayerProps> = ({
       direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), camYRotation);
       const nextX = groupRef.current.position.x + direction.x * moveSpeed * delta;
       const nextZ = groupRef.current.position.z + direction.z * moveSpeed * delta;
+      
+      const checkCollision = (nx: number, nz: number) => {
+        const limit = 145;
+        if (Math.abs(nx) > limit || Math.abs(nz) > limit) return true;
+        for (const obs of OBSTACLES) {
+          if ('radius' in obs) {
+            const d = Math.sqrt((nx - obs.x)**2 + (nz - obs.z)**2);
+            if (d < obs.radius + 1.5) return true;
+          } else {
+            const hw = (obs.w || 0)/2 + 1.5;
+            const hd = (obs.d || 0)/2 + 1.5;
+            if (nx > obs.x-hw && nx < obs.x+hw && nz > obs.z-hd && nz < obs.z+hd) return true;
+          }
+        }
+        return false;
+      };
+
       if (!checkCollision(nextX, groupRef.current.position.z)) groupRef.current.position.x = nextX;
       if (!checkCollision(groupRef.current.position.x, nextZ)) groupRef.current.position.z = nextZ;
-      const targetRotation = Math.atan2(direction.x, direction.z);
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotation, 12 * delta);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, Math.atan2(direction.x, direction.z), 12 * delta);
+    }
+
+    if ((keys['Space'] || jumpPressed) && isGrounded.current) {
+      velocityV.current = 15;
+      isGrounded.current = false;
+    }
+    if (!isGrounded.current) {
+      velocityV.current -= 35 * delta;
+      groupRef.current.position.y += velocityV.current * delta;
+      const groundY = isOnTrampoline ? 1.2 : 0;
+      if (groupRef.current.position.y <= groundY) {
+        groupRef.current.position.y = groundY;
+        velocityV.current = 0;
+        isGrounded.current = true;
+      }
     }
 
     const time = state.clock.elapsedTime * 14;
     if (isMoving && isGrounded.current) {
-      if (leftLegRef.current) leftLegRef.current.rotation.x = Math.sin(time) * 0.9;
-      if (rightLegRef.current) rightLegRef.current.rotation.x = -Math.sin(time) * 0.9;
-      if (leftArmRef.current) leftArmRef.current.rotation.x = -Math.sin(time) * 0.9;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(time) * 0.9;
-      groupRef.current.position.y = Math.abs(Math.sin(time)) * 0.2 + (isOnTrampoline ? 1.2 : 0);
-    } else if (!isGrounded.current) {
-        if (leftLegRef.current) leftLegRef.current.rotation.x = 0.2;
-        if (rightLegRef.current) rightLegRef.current.rotation.x = -0.2;
+      if (leftLegRef.current) leftLegRef.current.rotation.x = Math.sin(time) * 0.8;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = -Math.sin(time) * 0.8;
+      if (bodyRef.current) bodyRef.current.position.y = 2.4 + Math.abs(Math.sin(time)) * 0.15; 
     } else {
-      if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
-      if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
-      if (leftArmRef.current) leftArmRef.current.rotation.x = 0;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = 0;
+      const reset = (ref: any) => ref.current && (ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, 0, lerpSpeed));
+      reset(leftLegRef); reset(rightLegRef);
+      if (bodyRef.current) bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, 2.4, lerpSpeed);
     }
-
     onMove?.(groupRef.current.position);
   });
 
   return (
     <group ref={groupRef} position={[0, 0, 80]} visible={visible}>
-      <mesh position={[0, 3.5, 0]} castShadow>
-        <boxGeometry args={[2, 2.5, 1]} />
-        <meshStandardMaterial color="#3b82f6" />
-      </mesh>
-      <group position={[0, 5.3, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.7, 0.7, 1.2, 12]} />
-          <meshStandardMaterial color="#facc15" />
+      <group ref={bodyRef} position={[0, 2.4, 0]}>
+        <mesh position={[0, 1.25, 0]} castShadow>
+          <boxGeometry args={[2, 2.5, 1]} />
+          <meshStandardMaterial color="#3b82f6" />
         </mesh>
-        <group position={[0, 0.4, 0]}>
-          <mesh position={[0, 0.4, 0]} castShadow>
-            <boxGeometry args={[1.7, 0.5, 1.7]} />
-            <meshStandardMaterial color="#451a03" />
+        
+        {activeAccessory?.includes('cape') && <Accessory type={activeAccessory} />}
+
+        <group position={[0, 2.5, 0]}>
+          <mesh position={[0, 0.6, 0]} castShadow>
+            <cylinderGeometry args={[0.7, 0.7, 1.2, 12]} />
+            <meshStandardMaterial color="#facc15" />
           </mesh>
-          <mesh position={[0, 0, -0.6]} castShadow>
-            <boxGeometry args={[1.4, 1, 0.4]} />
-            <meshStandardMaterial color="#451a03" />
-          </mesh>
-          <mesh position={[0.8, 0, 0]} castShadow>
-            <boxGeometry args={[0.3, 1.2, 1.3]} />
-            <meshStandardMaterial color="#451a03" />
-          </mesh>
-          <mesh position={[-0.8, 0, 0]} castShadow>
-            <boxGeometry args={[0.3, 1.2, 1.3]} />
-            <meshStandardMaterial color="#451a03" />
-          </mesh>
+          
+          {activeAccessory?.includes('hat') || activeAccessory?.includes('crown') ? <Accessory type={activeAccessory} /> : (
+            <group position={[0, 1.0, 0]}>
+              <mesh position={[0, 0.4, 0]} castShadow><boxGeometry args={[1.7, 0.5, 1.7]} /><meshStandardMaterial color="#451a03" /></mesh>
+              <mesh position={[0, 0, -0.6]} castShadow><boxGeometry args={[1.4, 1, 0.4]} /><meshStandardMaterial color="#451a03" /></mesh>
+              <mesh position={[0.8, 0, 0]} castShadow><boxGeometry args={[0.3, 1.2, 1.3]} /><meshStandardMaterial color="#451a03" /></mesh>
+              <mesh position={[-0.8, 0, 0]} castShadow><boxGeometry args={[0.3, 1.2, 1.3]} /><meshStandardMaterial color="#451a03" /></mesh>
+            </group>
+          )}
+          
+          <PlayerFace />
         </group>
-        <PlayerFace />
+
+        <group ref={leftArmRef} position={[-1.3, 2.3, 0]}>
+          <mesh position={[0, -1.1, 0]} castShadow><boxGeometry args={[0.6, 2.2, 0.6]} /><meshStandardMaterial color="#facc15" /></mesh>
+        </group>
+        <group ref={rightArmRef} position={[1.3, 2.3, 0]}>
+          <mesh position={[0, -1.1, 0]} castShadow><boxGeometry args={[0.6, 2.2, 0.6]} /><meshStandardMaterial color="#facc15" /></mesh>
+        </group>
+        <group ref={leftLegRef} position={[-0.5, 0, 0]}>
+          <mesh position={[0, -1.2, 0]} castShadow><boxGeometry args={[0.8, 2.4, 0.9]} /><meshStandardMaterial color="#166534" /></mesh>
+        </group>
+        <group ref={rightLegRef} position={[0.5, 0, 0]}>
+          <mesh position={[0, -1.2, 0]} castShadow><boxGeometry args={[0.8, 2.4, 0.9]} /><meshStandardMaterial color="#166534" /></mesh>
+        </group>
       </group>
-      <mesh ref={leftArmRef} position={[-1.3, 3.5, 0]} castShadow>
-        <boxGeometry args={[0.6, 2.2, 0.6]} />
-        <meshStandardMaterial color="#facc15" />
-      </mesh>
-      <mesh ref={rightArmRef} position={[1.3, 3.5, 0]} castShadow>
-        <boxGeometry args={[0.6, 2.2, 0.6]} />
-        <meshStandardMaterial color="#facc15" />
-      </mesh>
-      <mesh ref={leftLegRef} position={[-0.5, 1.2, 0]} castShadow><boxGeometry args={[0.8, 2.4, 0.9]} /><meshStandardMaterial color="#166534" /></mesh>
-      <mesh ref={rightLegRef} position={[0.5, 1.2, 0]} castShadow><boxGeometry args={[0.8, 2.4, 0.9]} /><meshStandardMaterial color="#166534" /></mesh>
     </group>
   );
 };

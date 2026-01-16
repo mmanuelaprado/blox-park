@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import World from './components/World';
 import UIOverlay from './components/UIOverlay';
 import AudioSystem from './components/AudioSystem';
+import Shop from './components/Shop';
 
 const CameraManager: React.FC<{ 
   ridingRide: string | null, 
@@ -14,7 +15,6 @@ const CameraManager: React.FC<{
 }> = ({ ridingRide, rideRef, playerPos }) => {
   useFrame((state) => {
     if (ridingRide && rideRef.current) {
-      // Câmera no brinquedo
       const seat = rideRef.current;
       const worldPos = new THREE.Vector3();
       const worldQuat = new THREE.Quaternion();
@@ -37,10 +37,24 @@ const App: React.FC = () => {
   const [nearRide, setNearRide] = useState<string | null>(null);
   const [ridingRide, setRidingRide] = useState<string | null>(null);
   const [nearBench, setNearBench] = useState(false);
+  const [isShopOpen, setIsShopOpen] = useState(false);
   
+  // Sistema de Economia
+  const [coins, setCoins] = useState(50); // Começa com um pouco de dinheiro
+  const [ownedItems, setOwnedItems] = useState<string[]>([]);
+  const [activeAccessory, setActiveAccessory] = useState<string | null>(null);
+
   const orbitRef = useRef<any>(null);
   const [playerPos, setPlayerPos] = useState(new THREE.Vector3(0, 0, 80));
   const ridePOVRef = useRef<THREE.Group>(null);
+
+  // Ganho passivo de moedas
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCoins(prev => prev + 1);
+    }, 5000); // 1 moeda a cada 5 segundos
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleFirstClick = () => {
@@ -58,7 +72,6 @@ const App: React.FC = () => {
 
   const handlePlayerMove = (pos: THREE.Vector3) => {
     if (orbitRef.current && !ridingRide) {
-      // Aumentado para 0.2 para seguir mais de perto e rápido
       orbitRef.current.target.lerp(new THREE.Vector3(pos.x, pos.y + 4, pos.z), 0.2);
       orbitRef.current.update();
     }
@@ -72,11 +85,12 @@ const App: React.FC = () => {
     } else if (nearRide) {
       setRidingRide(nearRide);
       setIsSitting(true);
+      setCoins(prev => prev + 10); // Bônus por andar em brinquedos
     }
   };
 
   return (
-    <div className="w-full h-screen bg-sky-400 relative touch-none overflow-hidden select-none">
+    <div className="w-full h-screen bg-sky-400 relative touch-none overflow-hidden select-none font-sans">
       <Canvas 
         shadows 
         dpr={[1, 1.5]}
@@ -89,12 +103,12 @@ const App: React.FC = () => {
         <PerspectiveCamera makeDefault position={[0, 10, 20]} fov={60} />
         <OrbitControls 
           ref={orbitRef}
-          enabled={!ridingRide}
+          enabled={!ridingRide && !isShopOpen}
           enablePan={false}
           maxPolarAngle={Math.PI / 2.1}
           minPolarAngle={Math.PI / 6}
-          minDistance={12} // Mais próximo
-          maxDistance={25} // Reduzido de 40 para 25 para evitar que fique longe ao correr
+          minDistance={12}
+          maxDistance={25}
           makeDefault
         />
         
@@ -113,8 +127,7 @@ const App: React.FC = () => {
           ) : (
             <>
               <Stars radius={100} depth={50} count={3000} factor={4} />
-              <ambientLight intensity={0.2} color="#4444ff" />
-              <pointLight position={[0, 40, 0]} intensity={100} color="#ffaa00" />
+              <ambientLight intensity={0.4} color="#222244" />
             </>
           )}
 
@@ -128,6 +141,7 @@ const App: React.FC = () => {
             onPlayerMove={handlePlayerMove}
             ridingRide={ridingRide}
             ridePOVRef={ridePOVRef}
+            activeAccessory={activeAccessory}
           />
         </Suspense>
       </Canvas>
@@ -141,7 +155,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {!isSitting && !ridingRide && (
+      {!isSitting && !ridingRide && !isShopOpen && (
         <div 
           className="absolute bottom-10 left-10 w-32 h-32 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm flex items-center justify-center z-10"
           onTouchMove={(e) => {
@@ -183,7 +197,7 @@ const App: React.FC = () => {
           </button>
         )}
 
-        {!ridingRide && (
+        {!ridingRide && !isShopOpen && (
           <button 
             className="w-20 h-20 bg-blue-500/50 rounded-full border-4 border-white/30 backdrop-blur-md shadow-xl flex items-center justify-center active:scale-95 font-black text-xs uppercase"
             onTouchStart={() => isSitting ? setIsSitting(false) : setJumpPressed(true)}
@@ -196,7 +210,24 @@ const App: React.FC = () => {
         )}
       </div>
 
-      <UIOverlay dayTime={dayTime} toggleDay={() => setDayTime(!dayTime)} />
+      <UIOverlay 
+        dayTime={dayTime} 
+        toggleDay={() => setDayTime(!dayTime)} 
+        coins={coins} 
+        openShop={() => setIsShopOpen(true)}
+      />
+
+      {isShopOpen && (
+        <Shop 
+          coins={coins} 
+          setCoins={setCoins} 
+          ownedItems={ownedItems} 
+          setOwnedItems={setOwnedItems}
+          activeAccessory={activeAccessory}
+          setActiveAccessory={setActiveAccessory}
+          closeShop={() => setIsShopOpen(false)}
+        />
+      )}
     </div>
   );
 };

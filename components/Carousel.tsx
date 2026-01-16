@@ -1,13 +1,23 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import Sparkles from './Sparkles';
+import { useRideAudio } from './AudioSystem';
 
 const Carousel: React.FC<{ position: [number, number, number], isActive?: boolean }> = ({ position, isActive = false }) => {
   const groupRef = useRef<THREE.Group>(null);
   const horsesRef = useRef<(THREE.Group | null)[]>([]);
   const [speed, setSpeed] = useState(0);
   const pulseRef = useRef(0);
+
+  const audioNode = useRideAudio(isActive, 'music');
+
+  useEffect(() => {
+    if (groupRef.current && audioNode.current) {
+      groupRef.current.add(audioNode.current);
+    }
+  }, [audioNode]);
 
   useFrame((state, delta) => {
     const targetSpeed = isActive ? 0.7 : 0;
@@ -39,13 +49,14 @@ const Carousel: React.FC<{ position: [number, number, number], isActive?: boolea
 
   return (
     <group position={position}>
-      {/* Audio logic is now handled globally or bypassed for stability */}
-
+      <Sparkles active={isActive} count={40} color="#fbbf24" areaSize={[22, 10, 22]} speed={2} />
+      
       <pointLight 
-        position={[0, 12, 0]} 
-        intensity={isActive ? 5 + pulseRef.current * 15 : 1} 
+        position={[0, 8, 0]} 
+        intensity={isActive ? 20 + pulseRef.current * 30 : 0} 
         color="#facc15" 
-        distance={30} 
+        distance={20} 
+        decay={2}
       />
       
       <mesh position={[0, 0.5, 0]} receiveShadow>

@@ -17,18 +17,90 @@ const AudioSystem: React.FC<{ dayTime: boolean }> = ({ dayTime }) => {
   return null;
 };
 
-// Global SFX Utility for Mini-Games
+// Hook para criar um som de motor/ambiente posicional
+export const useRideAudio = (isActive: boolean, type: 'motor' | 'music' | 'coaster') => {
+  const { camera } = useThree();
+  const soundRef = useRef<THREE.PositionalAudio | null>(null);
+  const oscRef = useRef<OscillatorNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+
+  useEffect(() => {
+    const audioCtx = THREE.AudioContext.getContext();
+    const listener = camera.children.find(c => c instanceof THREE.AudioListener) as THREE.AudioListener;
+    
+    if (!listener) return;
+
+    const sound = new THREE.PositionalAudio(listener);
+    sound.setRefDistance(10);
+    sound.setMaxDistance(100);
+    soundRef.current = sound;
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainRef.current = gain;
+    
+    sound.setNodeSource(gain as any);
+
+    return () => {
+      if (oscRef.current) oscRef.current.stop();
+      sound.disconnect();
+    };
+  }, [camera]);
+
+  useEffect(() => {
+    const audioCtx = THREE.AudioContext.getContext();
+    const now = audioCtx.currentTime;
+
+    if (isActive) {
+      const osc = audioCtx.createOscillator();
+      const lfo = audioCtx.createOscillator();
+      const lfoGain = audioCtx.createGain();
+
+      if (type === 'motor') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(60, now);
+        lfo.frequency.setValueAtTime(0.5, now);
+        lfoGain.gain.setValueAtTime(10, now);
+        gainRef.current?.gain.exponentialRampToValueAtTime(0.1, now + 1);
+      } else if (type === 'music') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, now);
+        lfo.frequency.setValueAtTime(2, now);
+        lfoGain.gain.setValueAtTime(50, now);
+        gainRef.current?.gain.exponentialRampToValueAtTime(0.05, now + 1);
+      } else if (type === 'coaster') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(40, now);
+        lfo.frequency.setValueAtTime(8, now);
+        lfoGain.gain.setValueAtTime(20, now);
+        gainRef.current?.gain.exponentialRampToValueAtTime(0.15, now + 0.5);
+      }
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      osc.connect(gainRef.current!);
+      
+      osc.start();
+      lfo.start();
+      oscRef.current = osc;
+    } else {
+      gainRef.current?.gain.exponentialRampToValueAtTime(0.001, now + 1);
+      setTimeout(() => {
+        if (oscRef.current) {
+          oscRef.current.stop();
+          oscRef.current = null;
+        }
+      }, 1000);
+    }
+  }, [isActive, type]);
+
+  return soundRef;
+};
+
 export const playMiniGameSound = (type: 'pop' | 'clink' | 'break', position: THREE.Vector3, camera: THREE.Camera) => {
   const audioCtx = THREE.AudioContext.getContext();
   const panner = audioCtx.createPanner();
-  
-  // Set panner position relative to camera
   panner.panningModel = 'HRTF';
-  panner.distanceModel = 'inverse';
-  panner.refDistance = 5;
-  panner.maxDistance = 100;
-  panner.rolloffFactor = 1;
-  
   panner.positionX.value = position.x;
   panner.positionY.value = position.y;
   panner.positionZ.value = position.z;
@@ -39,53 +111,24 @@ export const playMiniGameSound = (type: 'pop' | 'clink' | 'break', position: THR
   panner.connect(masterGain);
 
   const now = audioCtx.currentTime;
-
   if (type === 'pop') {
-    // Balloon Pop: Short sine sweep + noise
     const osc = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    osc.type = 'sine';
     osc.frequency.setValueAtTime(400, now);
     osc.frequency.exponentialRampToValueAtTime(10, now + 0.1);
     g.gain.setValueAtTime(0.5, now);
     g.gain.linearRampToValueAtTime(0, now + 0.1);
-    osc.connect(g);
-    g.connect(panner);
-    osc.start();
-    osc.stop(now + 0.1);
+    osc.connect(g); g.connect(panner);
+    osc.start(); osc.stop(now + 0.1);
   } else if (type === 'clink') {
-    // Ring Toss Clink: High metallic ping
     const osc = audioCtx.createOscillator();
     const g = audioCtx.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
     g.gain.setValueAtTime(0.3, now);
     g.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-    osc.connect(g);
-    g.connect(panner);
-    osc.start();
-    osc.stop(now + 0.3);
-  } else if (type === 'break') {
-    // Bottle Break: White noise burst
-    const bufferSize = audioCtx.sampleRate * 0.2;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 1000;
-    const g = audioCtx.createGain();
-    g.gain.setValueAtTime(0.4, now);
-    g.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-    
-    noise.connect(filter);
-    filter.connect(g);
-    g.connect(panner);
-    noise.start();
+    osc.connect(g); g.connect(panner);
+    osc.start(); osc.stop(now + 0.3);
   }
 };
 

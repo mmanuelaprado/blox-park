@@ -1,7 +1,9 @@
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import Sparkles from './Sparkles';
+import { useRideAudio } from './AudioSystem';
 
 const RollerCoaster: React.FC<{ 
   position: [number, number, number], 
@@ -11,6 +13,14 @@ const RollerCoaster: React.FC<{
 }> = ({ position, isActive = false, isRiding = false, ridePOVRef }) => {
   const cartRef = useRef<THREE.Group>(null);
   
+  const audioNode = useRideAudio(isActive, 'coaster');
+
+  useEffect(() => {
+    if (cartRef.current && audioNode.current) {
+      cartRef.current.add(audioNode.current);
+    }
+  }, [audioNode]);
+
   const curve = useMemo(() => {
     const points: THREE.Vector3[] = [];
     for (let i = 0; i <= 24; i++) {
@@ -52,8 +62,7 @@ const RollerCoaster: React.FC<{
           <boxGeometry args={[2.5, 1.5, 4]} />
           <meshStandardMaterial color="#ef4444" />
         </mesh>
-        {/* POV offset para ficar "dentro" do carrinho */}
-        <group position={[0, 1.2, 0.5]} />
+        <Sparkles active={isActive} count={15} color="#60a5fa" areaSize={[3, 2, 5]} speed={0.5} />
       </group>
 
       {curve.getPoints(20).map((p, i) => (

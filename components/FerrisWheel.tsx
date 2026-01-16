@@ -1,7 +1,9 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import Sparkles from './Sparkles';
+import { useRideAudio } from './AudioSystem';
 
 const FerrisWheel: React.FC<{ 
   position: [number, number, number], 
@@ -12,6 +14,14 @@ const FerrisWheel: React.FC<{
   const wheelRef = useRef<THREE.Group>(null);
   const cabinsRef = useRef<(THREE.Group | null)[]>([]);
   const [speed, setSpeed] = useState(0);
+  
+  const audioNode = useRideAudio(isActive, 'motor');
+
+  useEffect(() => {
+    if (wheelRef.current && audioNode.current) {
+      wheelRef.current.add(audioNode.current);
+    }
+  }, [audioNode]);
 
   useFrame((state, delta) => {
     const targetSpeed = isActive ? 0.4 : 0;
@@ -25,7 +35,6 @@ const FerrisWheel: React.FC<{
     cabinsRef.current.forEach((cabin, i) => {
         if (cabin && wheelRef.current) {
             cabin.rotation.z = -wheelRef.current.rotation.z;
-            // Se o jogador estiver nesta roda gigante, anexamos o POV à primeira cabine
             if (isRiding && i === 0 && ridePOVRef) {
               ridePOVRef.current = cabin;
             }
@@ -60,8 +69,12 @@ const FerrisWheel: React.FC<{
                     <boxGeometry args={[3, 3, 3]} />
                     <meshStandardMaterial color={i % 2 === 0 ? "#3b82f6" : "#facc15"} />
                 </mesh>
-                {/* Ponto de vista da câmera */}
-                <group position={[0, 0, 1.2]} /> 
+                <Sparkles 
+                  active={isActive} 
+                  count={5} 
+                  color={i % 2 === 0 ? "#60a5fa" : "#fef08a"} 
+                  areaSize={[4, 4, 4]} 
+                />
              </group>
           </group>
         ))}

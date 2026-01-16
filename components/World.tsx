@@ -27,6 +27,7 @@ interface WorldProps {
   onPlayerMove?: (pos: THREE.Vector3) => void;
   ridingRide?: string | null;
   ridePOVRef?: React.MutableRefObject<THREE.Group | null>;
+  activeAccessory?: string | null;
 }
 
 const BENCH_POSITIONS: { pos: [number, number, number], rot: [number, number, number] }[] = [
@@ -43,31 +44,18 @@ const TRAMPOLINE_POS: [number, number, number] = [-30, 0, 90];
 const SWING_POS: [number, number, number] = [30, 0, 90];
 
 const World: React.FC<WorldProps> = ({ 
-  joystickVector, 
-  jumpPressed, 
-  isSitting = false, 
-  setIsSitting, 
-  onNearBench,
-  onNearRide,
-  onPlayerMove,
-  ridingRide,
-  ridePOVRef
+  joystickVector, jumpPressed, isSitting = false, setIsSitting, 
+  onNearBench, onNearRide, onPlayerMove, ridingRide, ridePOVRef, activeAccessory
 }) => {
   const [activeRides, setActiveRides] = useState({
-    ferris: false,
-    carousel: false,
-    roller: false,
-    swing: false
+    ferris: false, carousel: false, roller: false, swing: false
   });
   const [isOnTrampoline, setIsOnTrampoline] = useState(false);
 
   const checkProximity = (charPos: THREE.Vector3) => {
     onPlayerMove?.(charPos);
-    
-    // Detecção de Trampolim
     const trampPos = new THREE.Vector3(...TRAMPOLINE_POS);
-    const distToTramp = charPos.distanceTo(trampPos);
-    setIsOnTrampoline(distToTramp < 6);
+    setIsOnTrampoline(charPos.distanceTo(trampPos) < 6);
 
     const ferrisPos = new THREE.Vector3(-40, 0, -20);
     const carouselPos = new THREE.Vector3(40, 0, -20);
@@ -87,19 +75,13 @@ const World: React.FC<WorldProps> = ({
 
     let isNearAnyBench = false;
     for (const b of BENCH_POSITIONS) {
-      const bVec = new THREE.Vector3(...b.pos);
-      if (charPos.distanceTo(bVec) < 6) {
-        isNearAnyBench = true;
-        break;
-      }
+      if (charPos.distanceTo(new THREE.Vector3(...b.pos)) < 6) { isNearAnyBench = true; break; }
     }
     onNearBench?.(isNearAnyBench);
 
     setActiveRides({ 
-      ferris: distFerris < 60, 
-      carousel: distCarousel < 60, 
-      roller: distRoller < 80,
-      swing: distSwing < 40 
+      ferris: distFerris < 60, carousel: distCarousel < 60, 
+      roller: distRoller < 80, swing: distSwing < 40 
     });
   };
 
@@ -119,13 +101,13 @@ const World: React.FC<WorldProps> = ({
         benchPositions={BENCH_POSITIONS}
         visible={!ridingRide}
         isOnTrampoline={isOnTrampoline}
+        activeAccessory={activeAccessory}
       />
 
       <Character position={[-15, 0, 50]} id="noob1" benchPositions={BENCH_POSITIONS} />
       <Character position={[20, 0, 30]} id="noob2" benchPositions={BENCH_POSITIONS} />
       <Character position={[0, 0, -30]} id="noob3" benchPositions={BENCH_POSITIONS} />
       <Character position={[50, 0, 80]} id="noob4" benchPositions={BENCH_POSITIONS} />
-      <Character position={[-50, 0, 80]} id="noob5" benchPositions={BENCH_POSITIONS} />
 
       {BENCH_POSITIONS.map((b, i) => (
         <Bench key={i} position={b.pos} rotation={b.rot} onClick={() => setIsSitting?.(true)} />
@@ -133,12 +115,7 @@ const World: React.FC<WorldProps> = ({
 
       <EntranceSign />
       <Trampoline position={TRAMPOLINE_POS} />
-      <Swing 
-        position={SWING_POS} 
-        rotation={[0, Math.PI / 4, 0]} 
-        isRiding={ridingRide === 'swing'} 
-        ridePOVRef={ridePOVRef}
-      />
+      <Swing position={SWING_POS} rotation={[0, Math.PI / 4, 0]} isRiding={ridingRide === 'swing'} ridePOVRef={ridePOVRef} />
       <Slide position={[60, 0, 40]} rotation={[0, -Math.PI / 2, 0]} />
       <Spinner position={[-60, 0, 40]} />
 
