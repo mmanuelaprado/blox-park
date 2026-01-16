@@ -1,0 +1,7 @@
+{
+  "name": "Roblox Amusement Park Simulator 3D",
+  "description": "A 3D simulation of a Roblox-style amusement park environment with interactive rides, physics-based attractions, and a vibrant aesthetic.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
